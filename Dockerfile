@@ -9,12 +9,14 @@ COPY . .
 RUN find . -name "pom.xml" -exec mvn -f {} clean package -DskipTests \;
 
 # 2. Etapa de ejecución
-# ... (mantén la etapa 1 de "build" igual ya que esa funcionó)
-
+# 2. Etapa de ejecución
 FROM openjdk:17.0.1-jdk-slim
 WORKDIR /app
-# Buscamos el .jar y lo copiamos forzadamente
-COPY --from=build /app/target/*.jar app.jar
+
+# Copiamos el jar desde la carpeta target generada en la etapa anterior
+COPY --from=build /app/**/target/*.jar app.jar
+
 EXPOSE 8080
-# Verifica que no haya espacios extra aquí:
+
+# Asegúrate de que NO haya espacios extra aquí
 ENTRYPOINT ["java", "-jar", "app.jar"]
