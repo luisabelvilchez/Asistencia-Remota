@@ -2,17 +2,17 @@
 FROM maven:3.8.5-openjdk-17 AS build
 WORKDIR /app
 COPY . .
-# Buscamos y compilamos el proyecto
+# Buscamos el pom.xml en cualquier nivel y compilamos
 RUN find . -name "pom.xml" -exec mvn -f {} clean package -DskipTests \;
 
 # 2. Etapa de ejecución
 FROM openjdk:17.0.1-jdk-slim
 WORKDIR /app
 
-# Copiamos el .jar generado
-COPY --from=build /app/**/target/*.jar ./app.jar
+# Buscamos CUALQUIER .jar que se haya generado en cualquier carpeta target y lo traemos aquí
+RUN find /app -name "*.jar" -not -path "*/target/*-sources.jar" -exec cp {} ./app.jar \;
 
 EXPOSE 8080
 
-# Comando de inicio (Asegúrate de que diga ENTRYPOINT y -jar)
+# Comando de inicio limpio
 ENTRYPOINT ["java", "-jar", "app.jar"]
