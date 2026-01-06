@@ -9,10 +9,10 @@ RUN find . -name "pom.xml" -exec mvn -f {} clean package -DskipTests \;
 FROM openjdk:17.0.1-jdk-slim
 WORKDIR /app
 
-# Esta línea es la clave: busca CUALQUIER .jar generado y lo trae aquí
+# Copiamos el .jar generado
 COPY --from=build /app/**/target/*.jar ./app.jar
 
 EXPOSE 8080
 
-# Comando de inicio corregido (SIN espacios extra)
+# Comando de inicio (Asegúrate de que diga ENTRYPOINT y -jar)
 ENTRYPOINT ["java", "-jar", "app.jar"]
