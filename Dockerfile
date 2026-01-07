@@ -1,29 +1,12 @@
-# 1. Etapa de build (Java + Ant)
-FROM eclipse-temurin:23-jdk AS build
-WORKDIR /app
-
-# Instalamos ant
-RUN apt-get update && apt-get install -y ant
-
-# Copiamos el proyecto
+# 1. Etapa de compilación
+FROM maven:3.8.5-openjdk-17 AS build
 COPY . .
 
-# Entramos a la carpeta donde está build.xml
-WORKDIR /app/asistencia_remota
-
-# Compilamos con ANT
-RUN ant jar
+# Entramos a la carpeta del servidor y compilamos con Maven (que es lo que usa tu servidor)
+RUN cd asistencia/servidor && ./mvnw clean package -DskipTests
 
 # 2. Etapa de ejecución
-FROM eclipse-temurin:23-jre-alpine
-WORKDIR /app
-
-# Copiamos el jar generado por ANT
-COPY --from=build /app/asistencia_remota/dist/*.jar app.jar
-
-ENV SPRING_DATASOURCE_URL=jdbc:mysql://${MYSQLHOST}:${MYSQLPORT}/${MYSQL_DATABASE}
-ENV SPRING_DATASOURCE_USERNAME=${MYSQLUSER}
-ENV SPRING_DATASOURCE_PASSWORD=${MYSQLPASSWORD}
-
+FROM openjdk:17.0.1-jdk-slim
+COPY --from=build /asistencia/servidor/target/servidor-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java","-jar","app.jar"]
