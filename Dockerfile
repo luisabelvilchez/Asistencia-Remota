@@ -3,12 +3,15 @@ FROM eclipse-temurin:17-jdk-jammy AS build
 WORKDIR /app
 COPY . .
 
-# Damos permisos de ejecución al gradlew y compilamos
-RUN cd asistencia/servidor && chmod +x gradlew && ./gradlew bootJar --no-daemon
+# Usamos -Porg.gradle.java.installations.auto-download=false para evitar que intente bajar Java
+RUN cd asistencia/servidor && \
+    chmod +x gradlew && \
+    ./gradlew bootJar --no-daemon -Porg.gradle.java.installations.auto-download=false
 
 # 2. Etapa de ejecución
 FROM eclipse-temurin:17-jdk-jammy
 WORKDIR /app
 COPY --from=build /app/asistencia/servidor/build/libs/*.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java","-jar","app.jar"]
+# Agregamos parámetros de memoria para que no falle en el plan gratuito de Render
+ENTRYPOINT ["java", "-Xmx512m", "-jar", "app.jar"]
