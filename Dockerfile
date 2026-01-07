@@ -1,17 +1,20 @@
 # 1. Etapa de compilación
-FROM eclipse-temurin:17-jdk-jammy AS build
+FROM eclipse-temurin:21-jdk-jammy AS build
 WORKDIR /app
 COPY . .
 
-# Usamos -Porg.gradle.java.installations.auto-download=false para evitar que intente bajar Java
+# Forzamos el uso de Java 21 del sistema y saltamos detección de toolchain
 RUN cd asistencia/servidor && \
     chmod +x gradlew && \
-    ./gradlew bootJar --no-daemon -Porg.gradle.java.installations.auto-download=false
+    ./gradlew bootJar --no-daemon \
+    -Porg.gradle.java.installations.auto-download=false \
+    -Porg.gradle.java.installations.auto-detect=false \
+    -Dorg.gradle.java.home=/opt/java/openjdk
 
 # 2. Etapa de ejecución
-FROM eclipse-temurin:17-jdk-jammy
+FROM eclipse-temurin:21-jdk-jammy
 WORKDIR /app
 COPY --from=build /app/asistencia/servidor/build/libs/*.jar app.jar
 EXPOSE 8080
-# Agregamos parámetros de memoria para que no falle en el plan gratuito de Render
+# Límites de memoria para que el plan gratuito de Render no lo mate
 ENTRYPOINT ["java", "-Xmx512m", "-jar", "app.jar"]
