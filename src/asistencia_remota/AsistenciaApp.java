@@ -72,44 +72,74 @@ public class AsistenciaApp extends JFrame {
         add(btnRegistrar, gbc);
     }
 
-    private void validarYEnviarAsistencia() {
-        String nombreInput = txtNombre.getText().trim();
-        String dniInput = txtDni.getText().trim();
-        String tipo = comboTipo.getSelectedItem().toString();
+private void validarYEnviarAsistencia() {
+    String nombreInput = txtNombre.getText().trim();
+    String dniInput = txtDni.getText().trim();
 
-        if (nombreInput.isEmpty() || dniInput.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Por favor, llene todos los campos");
-            return;
-        }
+    if (nombreInput.isEmpty() || dniInput.isEmpty()) {
+        JOptionPane.showMessageDialog(this, "Por favor, llene todos los campos");
+        return;
+    }
 
-        try {
-            
-            String urlRailway = "jdbc:mysql://hopper.proxy.rlwy.net:50468/railway";
-            Connection cn = DriverManager.getConnection(urlRailway, "root", "TBuPxHmGYWbvFFwuSRXkWuxpYRMyWDaW");
-            //Connection cn = DriverManager.getConnection("jdbc:mysql://localhost:3306/sistema_deasistencias?serverTimezone=UTC&useSSL=false", "root", "1234");
+try {
+        String urlRailway = "jdbc:mysql://hopper.proxy.rlwy.net:50468/railway";
+        Connection cn = DriverManager.getConnection(urlRailway, "root", "TBuPxHmGYWbvFFwuSRXkWuxpYRMyWDaW");
 
-            // CAMBIO CLAVE: Validamos que el nombre Y el DNI coincidan con lo que el Admin registró
-            String sql = "SELECT * FROM empleados WHERE nombre_empleado = ? AND dni = ?";
-            PreparedStatement pst = cn.prepareStatement(sql);
-            pst.setString(1, nombreInput);
-            pst.setString(2, dniInput);
+        // 1. Verificar existencia del empleado
+        String sqlExiste = "SELECT * FROM empleados WHERE nombre_empleado = ? AND dni = ?";
+        PreparedStatement pstE = cn.prepareStatement(sqlExiste);
+        pstE.setString(1, nombreInput);
+        pstE.setString(2, dniInput);
+        ResultSet rsE = pstE.executeQuery();
 
-            ResultSet rs = pst.executeQuery();
+        if (rsE.next()) {
+            // 2. Consultar el historial de HOY (usando 'fecha_hora')
+            String sqlCheck = "SELECT tipo FROM registros WHERE dni = ? AND DATE(fecha_hora) = CURRENT_DATE ORDER BY id DESC LIMIT 1";
+            PreparedStatement pstC = cn.prepareStatement(sqlCheck);
+            pstC.setString(1, dniInput);
+            ResultSet rsC = pstC.executeQuery();
 
-            if (rs.next()) {
-                // SI COINCIDEN AMBOS: Procedemos al envío
-                procesarEnvioAPI(nombreInput, dniInput, tipo);
+            String tipoFinal = "";
+            boolean puedeRegistrar = true;
+
+            if (rsC.next()) {
+                // CASO: YA EXISTE AL MENOS UN REGISTRO HOY
+                String ultimoTipo = rsC.getString("tipo");
+
+                // Si lo último que hizo fue entrar, ahora le toca SALIR
+                if (ultimoTipo.equalsIgnoreCase("ENTRADA") || ultimoTipo.equalsIgnoreCase("TARDE")) {
+                    tipoFinal = "SALIDA";
+                } // NUEVO: Si lo último fue SALIDA, permitimos que vuelva a marcar ENTRADA
+                else if (ultimoTipo.equalsIgnoreCase("SALIDA")) {
+                    int respuesta = JOptionPane.showConfirmDialog(this,
+                            "Ya registró una salida hoy. ¿Desea registrar una NUEVA ENTRADA?",
+                            "Re-ingreso", JOptionPane.YES_NO_OPTION);
+
+                    if (respuesta == JOptionPane.YES_OPTION) {
+                        java.time.LocalTime ahora = java.time.LocalTime.now();
+                        java.time.LocalTime limite = java.time.LocalTime.of(8, 15);
+                        tipoFinal = ahora.isAfter(limite) ? "TARDE" : "ENTRADA";
+                    } else {
+                        puedeRegistrar = false;
+                    }
+                }
+            }
+
+            // 3. Ejecutar el registro solo si pasó los filtros
+            if (puedeRegistrar) {
+                procesarEnvioAPI(nombreInput, dniInput, tipoFinal);
                 txtNombre.setText("");
                 txtDni.setText("");
-            } else {
-                // SI NO COINCIDEN: Acceso denegado
-                JOptionPane.showMessageDialog(this, "DATOS INCORRECTOS O NO REGISTRADOS.\nVerifique su nombre y DNI con el Administrador.", "Acceso Denegado", JOptionPane.ERROR_MESSAGE);
             }
-            cn.close();
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Error de sistema: " + ex.getMessage());
+
+        } else {
+            JOptionPane.showMessageDialog(this, "Datos incorrectos o empleado no registrado.");
         }
+        cn.close();
+    } catch (Exception ex) {
+        JOptionPane.showMessageDialog(this, "Error de sistema: " + ex.getMessage());
     }
+}
 
     private void procesarEnvioAPI(String nombre, String dni, String tipo) {
         // Tu lógica original de ngrok
